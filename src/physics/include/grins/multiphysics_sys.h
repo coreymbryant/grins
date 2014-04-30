@@ -107,6 +107,7 @@ namespace GRINS
 
     //! System initialization. Calls each physics implementation of init_variables()
     virtual void init_data();
+    virtual void reinit_data();
 
     //! Each Physics will register their postprocessed quantities with this call
     void register_postprocessing_vars( const GetPot& input,

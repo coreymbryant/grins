@@ -112,6 +112,69 @@ namespace GRINS
       }
   }
 
+  void MultiphysicsSystem::reinit_data()
+  {
+    // Need this to be true because of our overloading of the
+    // mass_residual function.
+    // This is data in FEMSystem. MUST be set before FEMSystem::init_data.
+    use_fixed_solution = true;
+
+    // Initalize all the variables. We pass this pointer for the system.
+    /* NOTE: We CANNOT fuse this loop with the others. This loop
+       MUST complete first. */
+    /*! \todo Figure out how to tell compilers not to fuse this loop when
+      they want to be aggressive. */
+    for( GRINS::PhysicsListIter physics_iter = this->_physics_list.begin();
+   physics_iter != this->_physics_list.end();
+   physics_iter++ )
+      {
+  (physics_iter->second)->init_variables( this );
+      }
+
+    // Now set time_evolving variables
+    for( GRINS::PhysicsListIter physics_iter = this->_physics_list.begin();
+   physics_iter != this->_physics_list.end();
+   physics_iter++ )
+      {
+  (physics_iter->second)->set_time_evolving_vars( this );
+      }
+
+    // Set whether the problem we're solving is steady or not
+    // Since the variable is static, just call one Physics class
+    {
+      (this->_physics_list.begin()->second)->set_is_steady((this->time_solver)->is_steady());
+    }
+
+    for( GRINS::PhysicsListIter physics_iter = this->_physics_list.begin();
+   physics_iter != this->_physics_list.end();
+   physics_iter++ )
+      {
+  // Initialize builtin BC's for each physics
+  (physics_iter->second)->init_bcs( this );
+      }
+
+    // Next, call parent init_data function to intialize everything.
+    libMesh::FEMSystem::reinit();
+
+    // After solution has been initialized we can project initial
+    // conditions to it
+    CompositeFunction<Number> ic_function;
+    for( GRINS::PhysicsListIter physics_iter = this->_physics_list.begin();
+   physics_iter != this->_physics_list.end();
+   physics_iter++ )
+      {
+  // Initialize builtin IC's for each physics
+  (physics_iter->second)->init_ics( this, ic_function );
+      }
+
+    if (ic_function.n_subfunctions())
+      {
+        this->project_solution(&ic_function);
+      }
+
+    return;
+  }
+
   void MultiphysicsSystem::init_data()
   {
     // Need this to be true because of our overloading of the
